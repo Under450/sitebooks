@@ -1,0 +1,14 @@
+{
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "outputDirectory": ".next",
+  "env": {
+    "NEXT_PUBLIC_SUPABASE_URL": "https://cgisrvemvgvptqozxoib.supabase.co",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNnaXNydmVtdmd2cHRxb3p4b2liIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ4MTI0NDAsImV4cCI6MjA1MDM4ODQ0MH0.eyJpc3M6InN1cGFiYXNlIiwicmVmIjoiY2FqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ4MTI0NDAsImV4cCI6MjA1MDM4ODQ0MH0",
+    "NEXT_PUBLIC_APP_NAME": "SiteBooks",
+    "NEXT_PUBLIC_COMPANY_EMAIL": "info@sitebooks.co.uk",
+    "NEXT_PUBLIC_OWNER_NAME": "Craig Jeavons"
+  }
+}
