@@ -1,40 +1,144 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { useAuth } from '@/lib/auth/AuthContext';
+import { supabase } from '@/lib/supabase';
 
 export default function SettingsPage() {
+  const { user, signOut } = useAuth();
+  const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const [settings, setSettings] = useState({
-    ownerName: 'Craig Jeavons',
-    businessName: 'SiteBooks',
-    email: 'info@sitebooks.co.uk',
+    businessName: '',
+    email: '',
     phone: '',
+    address: '',
     defaultMileageRate: '0.45',
     vatRegistered: false,
+    vatNumber: '',
   });
 
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const handleSave = async () => {
-    // TODO: Save to Supabase or local storage
-    console.log('Saving settings:', settings);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
-  };
+  useEffect(() => {
+    if (user) {
+      loadProfile();
+    }
+  }, [user]);
 
-  const handleExportAllData = () => {
-    alert('Data export will download all your jobs, receipts, and mileage entries as a backup file.');
-  };
+  const loadProfile = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user?.id)
+        .single();
 
-  const handleDeleteAllData = () => {
-    if (confirm('⚠️ Are you sure? This will delete ALL your data permanently. This cannot be undone!')) {
-      if (confirm('🚨 FINAL WARNING: This will delete everything. Are you absolutely sure?')) {
-        alert('Delete functionality will be implemented with proper authentication.');
+      if (data) {
+        setSettings({
+          businessName: data.business_name || '',
+          email: data.email || '',
+          phone: data.phone || '',
+          address: data.address || '',
+          defaultMileageRate: data.default_mileage_rate?.toString() || '0.45',
+          vatRegistered: data.vat_registered || false,
+          vatNumber: data.vat_number || '',
+        });
+        setLogoUrl(data.logo_url);
       }
+    } catch (error) {
+      console.error('Error loading profile:', error);
+    } finally {
+      setLoading(false);
     }
   };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    setUploading(true);
+    try {
+      // Upload to Supabase Storage
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/logo.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('logos')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data } = supabase.storage
+        .from('logos')
+        .getPublicUrl(fileName);
+
+      // Update profile
+      await supabase
+        .from('profiles')
+        .update({
+          logo_url: data.publicUrl,
+          logo_path: fileName,
+        })
+        .eq('id', user.id);
+
+      setLogoUrl(data.publicUrl);
+      alert('✅ Logo uploaded successfully!');
+    } catch (error) {
+      console.error('Error uploading logo:', error);
+      alert('Failed to upload logo');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          business_name: settings.businessName,
+          phone: settings.phone,
+          address: settings.address,
+          default_mileage_rate: parseFloat(settings.defaultMileageRate),
+          vat_registered: settings.vatRegistered,
+          vat_number: settings.vatNumber,
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      alert('Failed to save settings');
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut();
+    router.push('/login');
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -47,17 +151,57 @@ export default function SettingsPage() {
       </header>
 
       <div className="px-6 py-6 space-y-6">
+        {/* Logo Upload */}
+        <section>
+          <h2 className="text-lg font-bold text-charcoal mb-4">Business Logo</h2>
+          
+          <div className="bg-white rounded-xl p-6 border border-gray-200">
+            {logoUrl ? (
+              <div className="space-y-4">
+                <img 
+                  src={logoUrl} 
+                  alt="Business logo" 
+                  className="max-w-xs max-h-32 object-contain mx-auto"
+                />
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  variant="secondary"
+                  fullWidth
+                  disabled={uploading}
+                >
+                  {uploading ? 'Uploading...' : 'Change Logo'}
+                </Button>
+              </div>
+            ) : (
+              <div className="text-center space-y-4">
+                <div className="text-6xl">🏢</div>
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  fullWidth
+                  disabled={uploading}
+                >
+                  {uploading ? 'Uploading...' : 'Upload Logo'}
+                </Button>
+                <p className="text-xs text-gray-500">
+                  PNG, JPG or SVG (max 2MB)
+                </p>
+              </div>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleLogoUpload}
+              className="hidden"
+            />
+          </div>
+        </section>
+
         {/* Business Information */}
         <section>
           <h2 className="text-lg font-bold text-charcoal mb-4">Business Information</h2>
           
           <div className="space-y-4">
-            <Input
-              label="Owner Name"
-              value={settings.ownerName}
-              onChange={(e) => setSettings({ ...settings, ownerName: e.target.value })}
-            />
-
             <Input
               label="Business Name"
               value={settings.businessName}
@@ -68,7 +212,8 @@ export default function SettingsPage() {
               label="Email"
               type="email"
               value={settings.email}
-              onChange={(e) => setSettings({ ...settings, email: e.target.value })}
+              disabled
+              helperText="Cannot be changed"
             />
 
             <Input
@@ -77,6 +222,13 @@ export default function SettingsPage() {
               value={settings.phone}
               onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
               placeholder="07700 900000"
+            />
+
+            <Input
+              label="Address (Optional)"
+              value={settings.address}
+              onChange={(e) => setSettings({ ...settings, address: e.target.value })}
+              placeholder="Your business address"
             />
           </div>
         </section>
@@ -111,66 +263,19 @@ export default function SettingsPage() {
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-amber/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber"></div>
                 </label>
               </div>
+              
+              {settings.vatRegistered && (
+                <div className="mt-4">
+                  <Input
+                    label="VAT Number"
+                    value={settings.vatNumber}
+                    onChange={(e) => setSettings({ ...settings, vatNumber: e.target.value })}
+                    placeholder="GB123456789"
+                  />
+                </div>
+              )}
             </div>
           </div>
-        </section>
-
-        {/* Data Management */}
-        <section>
-          <h2 className="text-lg font-bold text-charcoal mb-4">Data Management</h2>
-          
-          <div className="space-y-3">
-            <Button
-              onClick={handleExportAllData}
-              fullWidth
-              variant="secondary"
-            >
-              📦 Export All Data (Backup)
-            </Button>
-
-            <div className="bg-yellow-50 rounded-xl p-4 border border-yellow-200">
-              <p className="text-sm text-yellow-900">
-                <strong>💾 Backup Tip:</strong> Export your data regularly and store it safely. Keep backups for at least 6 years for HMRC compliance.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* App Information */}
-        <section>
-          <h2 className="text-lg font-bold text-charcoal mb-4">About</h2>
-          
-          <div className="bg-white rounded-xl p-4 border border-gray-200 space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Version:</span>
-              <span className="font-semibold">1.0.0</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Database:</span>
-              <span className="font-semibold text-profit">Connected ✓</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Tax Year:</span>
-              <span className="font-semibold">2024/2025</span>
-            </div>
-          </div>
-        </section>
-
-        {/* Danger Zone */}
-        <section>
-          <h2 className="text-lg font-bold text-cost mb-4">⚠️ Danger Zone</h2>
-          
-          <Button
-            onClick={handleDeleteAllData}
-            fullWidth
-            variant="danger"
-          >
-            🗑️ Delete All Data
-          </Button>
-          
-          <p className="text-xs text-gray-500 text-center mt-2">
-            This action cannot be undone
-          </p>
         </section>
 
         {/* Save Button */}
@@ -183,6 +288,19 @@ export default function SettingsPage() {
             {saved ? '✓ Saved!' : 'Save Settings'}
           </Button>
         </div>
+
+        {/* Account Actions */}
+        <section>
+          <h2 className="text-lg font-bold text-charcoal mb-4">Account</h2>
+          
+          <Button
+            onClick={handleLogout}
+            fullWidth
+            variant="secondary"
+          >
+            🚪 Sign Out
+          </Button>
+        </section>
       </div>
     </div>
   );
