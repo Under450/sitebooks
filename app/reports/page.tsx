@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { formatCurrency } from '@/utils/formatting';
-import { getCurrentTaxYear, getTaxYearLabel } from '@/utils/taxYear';
+import { getCurrentTaxYear } from '@/utils/taxYear';
 import { Button } from '@/components/ui/Button';
 
 interface TaxYearSummary {
