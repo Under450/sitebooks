@@ -20,7 +20,7 @@ export function formatDate(date: Date | string): string {
     month: 'short',
     year: 'numeric',
   };
-  return new Intl.DateFormat('en-GB', options).format(d);
+  return new Intl.DateTimeFormat('en-GB', options).format(d);
 }
 
 /**
