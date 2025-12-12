@@ -15,11 +15,12 @@ export function formatCurrency(amount: number): string {
  */
 export function formatDate(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date;
-  return new Intl.DateFormat('en-GB', {
+  const options: Intl.DateTimeFormatOptions = {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
-  }).format(d);
+  };
+  return new Intl.DateFormat('en-GB', options).format(d);
 }
 
 /**
