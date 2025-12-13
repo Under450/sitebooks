@@ -28,15 +28,56 @@ export default function Home() {
     const currentTaxYear = getCurrentTaxYear();
     setTaxYear(currentTaxYear);
     
-    // TODO: Load stats from database
-    // For now, using placeholder data
-    setStats({
-      totalIncome: 89450,
-      totalCosts: 28320,
-      totalProfit: 61130,
-      jobCount: 47,
-    });
-  }, []);
+    if (user) {
+      loadStats(currentTaxYear);
+    }
+  }, [user]);
+
+  const loadStats = async (taxYear: TaxYearInfo) => {
+    try {
+      const { supabase } = await import('@/lib/supabase');
+      
+      // Load jobs for current tax year
+      const { data: jobs, error: jobsError } = await supabase
+        .from('jobs')
+        .select('amount_invoiced')
+        .eq('user_id', user?.id)
+        .gte('job_date', taxYear.startDate.toISOString())
+        .lte('job_date', taxYear.endDate.toISOString());
+
+      if (jobsError) throw jobsError;
+
+      // Load receipts for current tax year  
+      const { data: receipts, error: receiptsError } = await supabase
+        .from('receipts')
+        .select('total_amount')
+        .eq('user_id', user?.id)
+        .gte('receipt_date', taxYear.startDate.toISOString())
+        .lte('receipt_date', taxYear.endDate.toISOString());
+
+      if (receiptsError) throw receiptsError;
+
+      // Calculate stats
+      const totalIncome = jobs?.reduce((sum, job) => sum + (job.amount_invoiced || 0), 0) || 0;
+      const totalCosts = receipts?.reduce((sum, receipt) => sum + (receipt.total_amount || 0), 0) || 0;
+      
+      setStats({
+        totalIncome,
+        totalCosts,
+        totalProfit: totalIncome - totalCosts,
+        jobCount: jobs?.length || 0,
+      });
+    } catch (error) {
+      console.error('Error loading stats:', error);
+      // Set to zeros if error
+      setStats({
+        totalIncome: 0,
+        totalCosts: 0,
+        totalProfit: 0,
+        jobCount: 0,
+      });
+    }
+  };
 
   if (loading) {
     return (
