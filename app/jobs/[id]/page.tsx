@@ -33,12 +33,30 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [profile, setProfile] = useState<{ business_name: string; logo_url: string | null } | null>(null);
 
   useEffect(() => {
     if (user) {
       loadJob();
+      loadProfile();
     }
   }, [user, params.id]);
+
+  const loadProfile = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('business_name, logo_url')
+        .eq('id', user?.id)
+        .single();
+
+      if (data) {
+        setProfile(data);
+      }
+    } catch (error) {
+      console.error('Error loading profile:', error);
+    }
+  };
 
   const loadJob = async () => {
     try {
@@ -98,9 +116,10 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         invoiceNumber = await generateInvoiceNumber();
       }
 
-      // Calculate due date
+      // Calculate due date (use payment_terms if exists, otherwise default to 30)
       const dueDate = new Date();
-      dueDate.setDate(dueDate.getDate() + (job.payment_terms || 30));
+      const paymentTerms = job.payment_terms || 30;
+      dueDate.setDate(dueDate.getDate() + paymentTerms);
 
       // Update job with invoice info
       const { error } = await supabase
@@ -108,20 +127,26 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         .update({
           invoice_number: invoiceNumber,
           payment_due_date: dueDate.toISOString().split('T')[0],
+          payment_terms: paymentTerms, // Set default if not exists
         })
         .eq('id', job.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
 
       // Reload job
       await loadJob();
       
+      alert('Invoice generated! Click OK to print.');
+      
       // Open print dialog
       window.print();
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating invoice:', error);
-      alert('Failed to generate invoice');
+      alert(`Failed to generate invoice: ${error.message || 'Unknown error'}`);
     } finally {
       setGenerating(false);
     }
@@ -347,6 +372,113 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               )}
             </>
           )}
+        </div>
+      </div>
+
+      {/* Printable Invoice (hidden on screen, shows when printing) */}
+      <div className="hidden print:block print:p-8">
+        <style jsx>{`
+          @media print {
+            body * {
+              visibility: hidden;
+            }
+            .print-invoice, .print-invoice * {
+              visibility: visible;
+            }
+            .print-invoice {
+              position: absolute;
+              left: 0;
+              top: 0;
+              width: 100%;
+            }
+          }
+        `}</style>
+        
+        <div className="print-invoice max-w-4xl mx-auto bg-white p-12">
+          {/* Header with Logo */}
+          <div className="flex justify-between items-start mb-8">
+            <div>
+              {profile?.logo_url ? (
+                <img src={profile.logo_url} alt="Logo" className="h-16 w-auto mb-4" />
+              ) : (
+                <div className="text-3xl font-bold text-charcoal mb-4">
+                  {profile?.business_name || 'SiteBooks'}
+                </div>
+              )}
+              <div className="text-2xl font-bold text-charcoal">INVOICE</div>
+            </div>
+            <div className="text-right">
+              <div className="font-bold text-xl mb-2">{job?.invoice_number}</div>
+              <div className="text-sm text-gray-600">
+                <div>Date: {new Date().toLocaleDateString()}</div>
+                {job?.payment_due_date && (
+                  <div>Due: {new Date(job.payment_due_date).toLocaleDateString()}</div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Bill To */}
+          <div className="mb-8">
+            <div className="font-bold text-gray-700 mb-2">Bill To:</div>
+            <div className="text-lg font-semibold">{job?.customer_name}</div>
+            <div className="text-gray-600">{job?.property_address}</div>
+            {job?.customer_email && <div className="text-gray-600">{job.customer_email}</div>}
+            {job?.customer_phone && <div className="text-gray-600">{job.customer_phone}</div>}
+          </div>
+
+          {/* Invoice Details */}
+          <table className="w-full mb-8 border-collapse">
+            <thead>
+              <tr className="border-b-2 border-gray-300">
+                <th className="text-left py-3 px-4">Description</th>
+                <th className="text-left py-3 px-4">Type</th>
+                <th className="text-right py-3 px-4">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b border-gray-200">
+                <td className="py-4 px-4">
+                  <div className="font-semibold">{job?.property_address}</div>
+                  {job?.description && <div className="text-sm text-gray-600 mt-1">{job.description}</div>}
+                  {job?.job_date && <div className="text-xs text-gray-500 mt-1">Completed: {new Date(job.job_date).toLocaleDateString()}</div>}
+                </td>
+                <td className="py-4 px-4">{job?.job_type}</td>
+                <td className="py-4 px-4 text-right font-semibold">
+                  {formatCurrency(job?.amount_invoiced || 0)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* Total */}
+          <div className="flex justify-end mb-8">
+            <div className="w-64">
+              <div className="flex justify-between py-2 border-b border-gray-200">
+                <span className="text-gray-600">Subtotal:</span>
+                <span className="font-semibold">{formatCurrency(job?.amount_invoiced || 0)}</span>
+              </div>
+              <div className="flex justify-between py-3 border-t-2 border-gray-800">
+                <span className="font-bold text-lg">Total Due:</span>
+                <span className="font-bold text-lg">{formatCurrency(job?.amount_invoiced || 0)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Payment Terms */}
+          <div className="text-sm text-gray-600 mb-8">
+            <div className="font-semibold mb-2">Payment Terms:</div>
+            <div>Payment due within {job?.payment_terms || 30} days</div>
+            {job?.payment_due_date && (
+              <div>Due date: {new Date(job.payment_due_date).toLocaleDateString()}</div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="border-t border-gray-300 pt-4 text-center text-xs text-gray-500">
+            <div>Thank you for your business!</div>
+            <div className="mt-1">{profile?.business_name || 'SiteBooks'}</div>
+          </div>
         </div>
       </div>
     </div>
