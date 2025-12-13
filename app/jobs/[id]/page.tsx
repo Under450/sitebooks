@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
 import { formatCurrency } from '@/utils/formatting';
 import { PaymentTracker } from '@/components/payments/PaymentTracker';
+import { InvoiceItemsManager } from '@/components/invoice/InvoiceItemsManager';
 
 interface Job {
   id: string;
@@ -36,11 +37,13 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [profile, setProfile] = useState<{ business_name: string; logo_url: string | null } | null>(null);
+  const [invoiceItems, setInvoiceItems] = useState<any[]>([]);
 
   useEffect(() => {
     if (user) {
       loadJob();
       loadProfile();
+      loadInvoiceItems();
     }
   }, [user, params.id]);
 
@@ -57,6 +60,21 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       }
     } catch (error) {
       console.error('Error loading profile:', error);
+    }
+  };
+
+  const loadInvoiceItems = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('invoice_items')
+        .select('*')
+        .eq('job_id', params.id)
+        .order('item_order', { ascending: true });
+
+      if (error) throw error;
+      setInvoiceItems(data || []);
+    } catch (error) {
+      console.error('Error loading invoice items:', error);
     }
   };
 
@@ -321,6 +339,19 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
+        {/* Invoice Items */}
+        <div className="space-y-3">
+          <h3 className="font-bold text-charcoal">Invoice Line Items</h3>
+          <InvoiceItemsManager
+            jobId={job.id}
+            userId={user.id}
+            onUpdate={() => {
+              loadJob();
+              loadInvoiceItems();
+            }}
+          />
+        </div>
+
         {/* Payment Tracking */}
         <div className="space-y-3">
           <h3 className="font-bold text-charcoal">Payments</h3>
@@ -414,7 +445,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           <div className="flex justify-between items-start mb-8">
             <div>
               {profile?.logo_url ? (
-                <img src={profile.logo_url} alt="Logo" className="h-16 w-auto mb-4" />
+                <img src={profile.logo_url} alt="Logo" className="h-20 w-auto max-w-[200px] object-contain mb-4" />
               ) : (
                 <div className="text-3xl font-bold text-charcoal mb-4">
                   {profile?.business_name || 'SiteBooks'}
@@ -447,21 +478,38 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             <thead>
               <tr className="border-b-2 border-gray-300">
                 <th className="text-left py-3 px-4">Description</th>
-                <th className="text-left py-3 px-4">Type</th>
+                <th className="text-center py-3 px-4">Qty</th>
+                <th className="text-right py-3 px-4">Unit Price</th>
                 <th className="text-right py-3 px-4">Amount</th>
               </tr>
             </thead>
             <tbody>
-              <tr className="border-b border-gray-200">
-                <td className="py-4 px-4">
-                  <div className="font-semibold">{job?.property_address}</div>
-                  {job?.description && <div className="text-sm text-gray-600 mt-1">{job.description}</div>}
-                  {job?.job_date && <div className="text-xs text-gray-500 mt-1">Completed: {new Date(job.job_date).toLocaleDateString()}</div>}
-                </td>
-                <td className="py-4 px-4">{job?.job_type}</td>
-                <td className="py-4 px-4 text-right font-semibold">
-                  {formatCurrency(job?.amount_invoiced || 0)}
-                </td>
+              {invoiceItems.length > 0 ? (
+                invoiceItems.map((item: any) => (
+                  <tr key={item.id} className="border-b border-gray-200">
+                    <td className="py-4 px-4">
+                      <div className="font-semibold">{item.description}</div>
+                    </td>
+                    <td className="py-4 px-4 text-center">{item.quantity}</td>
+                    <td className="py-4 px-4 text-right">{formatCurrency(item.unit_price)}</td>
+                    <td className="py-4 px-4 text-right font-semibold">
+                      {formatCurrency(item.amount)}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr className="border-b border-gray-200">
+                  <td className="py-4 px-4" colSpan={2}>
+                    <div className="font-semibold">{job?.job_type}</div>
+                    {job?.description && <div className="text-sm text-gray-600 mt-1">{job.description}</div>}
+                    {job?.job_date && <div className="text-xs text-gray-500 mt-1">Completed: {new Date(job.job_date).toLocaleDateString()}</div>}
+                  </td>
+                  <td className="py-4 px-4 text-center">1</td>
+                  <td className="py-4 px-4 text-right font-semibold">
+                    {formatCurrency(job?.amount_invoiced || 0)}
+                  </td>
+                </tr>
+              )}
               </tr>
             </tbody>
           </table>
