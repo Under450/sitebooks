@@ -11,6 +11,7 @@ export default function Home() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [taxYear, setTaxYear] = useState<TaxYearInfo | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [stats, setStats] = useState({
     totalIncome: 0,
     totalCosts: 0,
@@ -30,8 +31,26 @@ export default function Home() {
     
     if (user) {
       loadStats(currentTaxYear);
+      loadLogo();
     }
   }, [user]);
+
+  const loadLogo = async () => {
+    try {
+      const { supabase } = await import('@/lib/supabase');
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('logo_url')
+        .eq('id', user?.id)
+        .single();
+
+      if (data?.logo_url) {
+        setLogoUrl(data.logo_url);
+      }
+    } catch (error) {
+      console.error('Error loading logo:', error);
+    }
+  };
 
   const loadStats = async (taxYear: TaxYearInfo) => {
     try {
@@ -106,9 +125,15 @@ export default function Home() {
         <div className="px-6 py-6">
           {/* Logo */}
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-amber rounded-xl flex items-center justify-center">
-              <span className="text-white text-xl font-bold">SB</span>
-            </div>
+            {logoUrl ? (
+              <div className="w-12 h-12 rounded-xl overflow-hidden bg-white flex items-center justify-center">
+                <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
+              </div>
+            ) : (
+              <div className="w-12 h-12 bg-amber rounded-xl flex items-center justify-center">
+                <span className="text-white text-xl font-bold">SB</span>
+              </div>
+            )}
             <h1 className="text-2xl font-bold tracking-tight">SiteBooks</h1>
           </div>
           
