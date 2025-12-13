@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useAuth } from '@/lib/auth/AuthContext';
+import { supabase } from '@/lib/supabase';
 import { formatCurrency, formatDate } from '@/utils/formatting';
 import { getCurrentTaxYear } from '@/utils/taxYear';
 import type { Job } from '@/types';
@@ -57,19 +59,34 @@ const MOCK_JOBS: Job[] = [
 ];
 
 export default function JobsListPage() {
+  const { user } = useAuth();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
   const taxYear = getCurrentTaxYear();
 
   useEffect(() => {
-    // TODO: Load jobs from Supabase
-    // For now, use mock data
-    setTimeout(() => {
-      setJobs(MOCK_JOBS);
+    if (user) {
+      loadJobs();
+    }
+  }, [user]);
+
+  const loadJobs = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('jobs')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('job_date', { ascending: false });
+
+      if (error) throw error;
+      setJobs(data || []);
+    } catch (error) {
+      console.error('Error loading jobs:', error);
+    } finally {
       setLoading(false);
-    }, 500);
-  }, []);
+    }
+  };
 
   const filteredJobs = jobs.filter((job) => {
     if (filter === 'all') return true;
