@@ -1,11 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { getCurrentTaxYear, type TaxYearInfo } from '@/utils/taxYear';
 import { formatCurrency } from '@/utils/formatting';
+import { useAuth } from '@/lib/auth/AuthContext';
 import Link from 'next/link';
 
 export default function Home() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
   const [taxYear, setTaxYear] = useState<TaxYearInfo | null>(null);
   const [stats, setStats] = useState({
     totalIncome: 0,
@@ -13,6 +17,12 @@ export default function Home() {
     totalProfit: 0,
     jobCount: 0,
   });
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login');
+    }
+  }, [user, loading, router]);
 
   useEffect(() => {
     const currentTaxYear = getCurrentTaxYear();
@@ -27,6 +37,18 @@ export default function Home() {
       jobCount: 47,
     });
   }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   if (!taxYear) {
     return (
