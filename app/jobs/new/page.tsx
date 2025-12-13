@@ -27,7 +27,8 @@ export default function NewJobPage() {
     customer_name: '',
     customer_phone: '',
     customer_email: '',
-    amount_invoiced: '',
+    labour_amount: '',
+    materials_amount: '',
     job_date: formatDateForInput(new Date()),
   });
 
@@ -87,6 +88,10 @@ export default function NewJobPage() {
       // Get tax year for this job
       const taxYear = getCurrentTaxYear();
       
+      const labourAmount = parseFloat(formData.labour_amount) || 0;
+      const materialsAmount = parseFloat(formData.materials_amount) || 0;
+      const totalAmount = labourAmount + materialsAmount;
+      
       // Save to Supabase
       const { error } = await supabase.from('jobs').insert({
         user_id: user.id,
@@ -96,7 +101,9 @@ export default function NewJobPage() {
         customer_name: formData.customer_name,
         customer_phone: formData.customer_phone || null,
         customer_email: formData.customer_email || null,
-        amount_invoiced: parseFloat(formData.amount_invoiced) || 0,
+        labour_amount: labourAmount,
+        materials_amount: materialsAmount,
+        amount_invoiced: totalAmount,
         job_date: formData.job_date,
         tax_year: taxYear.label,
         payment_status: 'unpaid',
@@ -228,22 +235,45 @@ export default function NewJobPage() {
         {/* Divider */}
         <div className="border-t border-gray-300 pt-6">
           <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-4">
-            Payment (Optional)
+            Invoice Amount
           </h2>
         </div>
 
-        {/* Amount Invoiced */}
+        {/* Labour Amount */}
         <Input
-          label="Amount Invoiced"
-          name="amount_invoiced"
+          label="Labour"
+          name="labour_amount"
           type="number"
           step="0.01"
           min="0"
-          value={formData.amount_invoiced}
+          value={formData.labour_amount}
           onChange={handleChange}
-          placeholder="2500.00"
-          helperText="You can add this later"
+          placeholder="500.00"
+          helperText="Labour costs"
         />
+
+        {/* Materials Amount */}
+        <Input
+          label="Materials/Parts"
+          name="materials_amount"
+          type="number"
+          step="0.01"
+          min="0"
+          value={formData.materials_amount}
+          onChange={handleChange}
+          placeholder="150.00"
+          helperText="Cost of materials and parts"
+        />
+
+        {/* Total (calculated) */}
+        <div className="bg-amber/10 rounded-xl p-4 border border-amber/30">
+          <div className="flex justify-between items-center">
+            <span className="font-semibold text-charcoal">Total Invoice Amount:</span>
+            <span className="text-2xl font-bold text-charcoal">
+              £{((parseFloat(formData.labour_amount) || 0) + (parseFloat(formData.materials_amount) || 0)).toFixed(2)}
+            </span>
+          </div>
+        </div>
 
         {/* Submit Buttons */}
         <div className="pt-6 space-y-3">
