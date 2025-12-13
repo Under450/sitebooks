@@ -293,6 +293,18 @@ export default function SettingsPage() {
         <section>
           <h2 className="text-lg font-bold text-charcoal mb-4">Account</h2>
           
+          {user?.email === 'caj@me.com' && (
+            <Link href="/admin">
+              <Button
+                fullWidth
+                variant="primary"
+                className="mb-3"
+              >
+                👑 Admin Panel
+              </Button>
+            </Link>
+          )}
+          
           <Button
             onClick={handleLogout}
             fullWidth
