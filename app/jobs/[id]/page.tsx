@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
 import { formatCurrency } from '@/utils/formatting';
+import { PaymentTracker } from '@/components/payments/PaymentTracker';
 
 interface Job {
   id: string;
@@ -17,6 +18,7 @@ interface Job {
   customer_email: string;
   customer_phone: string;
   amount_invoiced: number;
+  amount_paid: number;
   job_date: string;
   payment_status: string;
   status: string;
@@ -231,10 +233,12 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         <div className="flex gap-2 flex-wrap">
           <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
             job.payment_status === 'paid' ? 'bg-profit/20 text-profit' :
+            job.payment_status === 'partial' ? 'bg-blue-100 text-blue-800' :
             job.payment_status === 'invoiced' ? 'bg-amber/20 text-amber' :
             'bg-cost/20 text-cost'
           }`}>
             {job.payment_status === 'paid' ? '✓ Paid' :
+             job.payment_status === 'partial' ? '💵 Partially Paid' :
              job.payment_status === 'invoiced' ? '📄 Invoiced' :
              '⏳ Unpaid'}
           </span>
@@ -316,6 +320,17 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             <p className="text-sm text-gray-700">{job.description}</p>
           </div>
         )}
+
+        {/* Payment Tracking */}
+        <div className="space-y-3">
+          <h3 className="font-bold text-charcoal">Payments</h3>
+          <PaymentTracker
+            jobId={job.id}
+            userId={user.id}
+            totalAmount={job.amount_invoiced}
+            onPaymentUpdate={loadJob}
+          />
+        </div>
 
         {/* Invoice Actions */}
         <div className="space-y-3">
