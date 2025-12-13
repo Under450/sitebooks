@@ -10,9 +10,12 @@ import { Button } from '@/components/ui/Button';
 import { JOB_TYPES } from '@/types';
 import { getCurrentTaxYear } from '@/utils/taxYear';
 import { formatDateForInput } from '@/utils/formatting';
+import { useAuth } from '@/lib/auth/AuthContext';
+import { supabase } from '@/lib/supabase';
 
 export default function NewJobPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   
@@ -73,23 +76,34 @@ export default function NewJobPage() {
       return;
     }
     
+    if (!user) {
+      alert('You must be logged in to create a job');
+      return;
+    }
+    
     setLoading(true);
     
     try {
       // Get tax year for this job
       const taxYear = getCurrentTaxYear();
       
-      // TODO: Save to Supabase
-      // For now, just simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      console.log('Job data:', {
-        ...formData,
-        tax_year: taxYear.label,
+      // Save to Supabase
+      const { error } = await supabase.from('jobs').insert({
+        user_id: user.id,
+        property_address: formData.property_address,
+        job_type: formData.job_type === 'Other' ? formData.custom_job_type : formData.job_type,
+        description: formData.description,
+        customer_name: formData.customer_name,
+        customer_phone: formData.customer_phone || null,
+        customer_email: formData.customer_email || null,
         amount_invoiced: parseFloat(formData.amount_invoiced) || 0,
+        job_date: formData.job_date,
+        tax_year: taxYear.label,
         payment_status: 'unpaid',
         status: 'active',
       });
+      
+      if (error) throw error;
       
       // Show success and redirect
       alert('Job created successfully!');
