@@ -293,7 +293,7 @@ export default function SettingsPage() {
         <section>
           <h2 className="text-lg font-bold text-charcoal mb-4">Account</h2>
           
-          {user?.email === 'caj@me.com' && (
+          {user?.email?.toLowerCase() === 'caj@me.com' && (
             <Link href="/admin">
               <Button
                 fullWidth
