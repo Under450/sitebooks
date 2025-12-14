@@ -23,13 +23,15 @@ export default function AdminPage() {
   const [adminEmail] = useState('caj@me.com'); // Your admin email
 
   useEffect(() => {
+    console.log('User:', user?.email, 'Admin:', adminEmail, 'Match:', user?.email?.toLowerCase() === adminEmail.toLowerCase());
+    
     if (!loading && !user) {
       router.push('/login');
-    } else if (user && user.email !== adminEmail) {
+    } else if (user && user.email?.toLowerCase() !== adminEmail.toLowerCase()) {
       // Not admin - redirect to home
-      alert('Access denied - Admin only');
+      alert(`Access denied - Admin only. Your email: ${user.email}`);
       router.push('/');
-    } else if (user && user.email === adminEmail) {
+    } else if (user && user.email?.toLowerCase() === adminEmail.toLowerCase()) {
       loadUsers();
     }
   }, [user, loading, router, adminEmail]);
